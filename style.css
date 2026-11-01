@@ -386,7 +386,17 @@ footer {
   border-top: 1px solid rgba(229, 9, 20, 0.18);
 }
 
-@media (max-width: 780px) {
+/* Tablets and large phones */
+@media (max-width: 900px) {
+  main {
+    width: min(100% - 24px, 1180px);
+    gap: 16px;
+  }
+
+  .panel {
+    padding: 18px 16px;
+  }
+
   .memory-layout {
     grid-template-columns: 1fr;
   }
@@ -396,12 +406,162 @@ footer {
     border-top: 1px solid rgba(229, 9, 20, 0.22);
     padding: 18px 0 0;
   }
+}
+
+/* Phones */
+@media (max-width: 640px) {
+  body {
+    font-size: 15px;
+  }
+
+  .site-header {
+    padding: 34px 14px 22px;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 11vw, 3.2rem);
+    letter-spacing: 0.04em;
+  }
+
+  .subtitle {
+    font-size: 0.62rem;
+    letter-spacing: 0.3em;
+  }
+
+  .tagline {
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+  }
+
+  main {
+    width: 100%;
+    padding: 0 12px 48px;
+    gap: 14px;
+  }
+
+  .panel {
+    padding: 16px 14px;
+    border-radius: 6px;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+    margin-bottom: 14px;
+  }
 
   .form-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  input[type="number"] {
+    padding: 14px;
+    font-size: 16px; /* prevents iOS zoom-on-focus */
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 14px 10px;
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+  }
+
+  .btn.primary {
+    grid-column: 1 / -1;
   }
 
   .clock-label {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  input[type="range"] {
+    height: 34px;
+  }
+
+  .register-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .register {
+    padding: 12px;
+  }
+
+  .register .value {
+    font-size: 0.95rem;
+  }
+
+  .decode-row {
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.8rem;
+  }
+
+  .memory-layout {
+    gap: 16px;
+  }
+
+  .ram-table {
+    font-size: 0.72rem;
+  }
+
+  .ram-table th,
+  .ram-table td {
+    padding: 7px 6px;
+  }
+
+  .bus-track {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bus-node {
+    padding: 12px 6px;
+  }
+
+  .led-row {
+    gap: 8px;
+    padding: 14px 0;
+  }
+
+  .led {
+    width: 20px;
+    height: 20px;
+  }
+
+  .output-reading {
+    font-size: 0.75rem;
+    line-height: 1.6;
+  }
+
+  footer {
+    font-size: 0.62rem;
+    padding: 18px 12px;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 380px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .register-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .led-row {
+    gap: 6px;
+  }
+
+  .led {
+    width: 17px;
+    height: 17px;
   }
 }
