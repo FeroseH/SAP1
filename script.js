@@ -25,10 +25,13 @@ let halted = true;
 let running = false;
 let runTimer = null;
 let awaitingFetch = true;
+
 const elements = {
   dataA: document.getElementById("dataA"),
   dataB: document.getElementById("dataB"),
   dataC: document.getElementById("dataC"),
+  operationB: document.getElementById("operationB"),
+  operationC: document.getElementById("operationC"),
   loadBtn: document.getElementById("loadBtn"),
   stepBtn: document.getElementById("stepBtn"),
   runBtn: document.getElementById("runBtn"),
@@ -62,10 +65,19 @@ function toHex(value) {
 }
 
 function clampByte(value) {
-  return value & 0xff;
+  return ((value % 256) + 256) % 256;
 }
 
+function validateData(raw, label) {
+  const value = Number(raw);
 
+  if (!Number.isInteger(value) || value < 0 || value > 255) {
+    elements.status.textContent = `${label} must be an integer from 0 to 255.`;
+    return null;
+  }
+
+  return value;
+}
 
 function renderRam(activeAddress = null) {
   elements.ramBody.innerHTML = "";
@@ -154,37 +166,49 @@ function loadProgram() {
   const b = validateData(elements.dataB.value, "Data B");
   const c = validateData(elements.dataC.value, "Data C");
 
+  const operationB = elements.operationB.value;
+  const operationC = elements.operationC.value;
+
   if (a === null || b === null || c === null) return;
 
   ram = new Array(16).fill(0);
-  ram[0] = 0b00001001; // LDA 9H
-  ram[1] = 0b00011010; // ADD AH
-  ram[2] = 0b00101011; // SUB BH
+
+  // Data locations
+  const ADDRESS_A = 0x9; // 9H
+  const ADDRESS_B = 0xa; // AH
+  const ADDRESS_C = 0xb; // BH
+
+  // Instruction 0: LDA 9H
+  ram[0] = (0b0000 << 4) | ADDRESS_A;
+
+  // Instruction 1: ADD AH or SUB AH
+  ram[1] = operationB === "ADD"
+    ? (0b0001 << 4) | ADDRESS_B
+    : (0b0010 << 4) | ADDRESS_B;
+
+  // Instruction 2: ADD BH or SUB BH
+  ram[2] = operationC === "ADD"
+    ? (0b0001 << 4) | ADDRESS_C
+    : (0b0010 << 4) | ADDRESS_C;
+
+  // Instructions 3 and 4
   ram[3] = 0b11101111; // OUT
   ram[4] = 0b11111111; // HLT
 
-  ram[9] = a;  // 9H
-  ram[10] = b; // AH
-  ram[11] = c; // BH
+  // Store user data
+  ram[ADDRESS_A] = a;
+  ram[ADDRESS_B] = b;
+  ram[ADDRESS_C] = c;
 
   resetRegisters(false);
 
+  const symbolB = operationB === "ADD" ? "+" : "−";
+  const symbolC = operationC === "ADD" ? "+" : "−";
+
   elements.status.textContent =
-    `Program loaded. Computing ${a} + ${b} − ${c}. Press Step or Run.`;
+    `Program loaded: ${a} ${symbolB} ${b} ${symbolC} ${c}. Press Step or Run.`;
 
   render(0, "pc", ["pc"]);
-}
-
-function validateData(raw, label) {
-  const value = Number(raw);
-
-  if (!Number.isInteger(value) || value < 0 || value > 255) {
-    elements.status.textContent =
-      `${label} must be an integer from 0 to 255.`;
-    return null;
-  }
-
-  return value;
 }
 
 function resetRegisters(clearRam = true) {
@@ -195,7 +219,7 @@ function resetRegisters(clearRam = true) {
   bRegister = 0;
   outputRegister = 0;
   halted = false;
-  awaitingFetch = true; // <-- add this line
+  awaitingFetch = true;
 
   stopRun();
 
@@ -211,7 +235,6 @@ function fetchPhase() {
   mar = pc;
   ir = ram[mar];
   pc = (pc + 1) & 0x0f;
-
   awaitingFetch = false;
 
   render(mar, "ir", ["pc", "mar", "ram", "ir"]);
@@ -280,9 +303,6 @@ function executePhase() {
   }
 }
 
-
-
-
 function step() {
   if (halted) {
     elements.status.textContent = "The processor is halted. Load a program or reset.";
@@ -311,6 +331,7 @@ function run() {
   elements.runBtn.textContent = "Stop";
 
   const delay = Number(elements.clockSpeed.value);
+
   runTimer = setInterval(() => {
     step();
 

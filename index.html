@@ -24,24 +24,42 @@
       <h2>Load Program</h2>
 
       <div class="form-grid">
-        <label>
-          Data A
-          <input id="dataA" type="number" min="0" max="255" value="37" />
-        </label>
-        <label>
-          Data B
-          <input id="dataB" type="number" min="0" max="255" value="5" />
-        </label>
-        <label>
-          Data C
-          <input id="dataC" type="number" min="0" max="255" value="35" />
-        </label>
-      </div>
+  <label>
+    Data A
+    <input id="dataA" type="number" min="0" max="255" value="37" />
+  </label>
+
+  <label>
+    Operation for B
+    <select id="operationB">
+      <option value="ADD">Add B (+)</option>
+      <option value="SUB">Subtract B (−)</option>
+    </select>
+  </label>
+
+  <label>
+    Data B
+    <input id="dataB" type="number" min="0" max="255" value="5" />
+  </label>
+
+  <label>
+    Operation for C
+    <select id="operationC">
+      <option value="SUB">Subtract C (−)</option>
+      <option value="ADD">Add C (+)</option>
+    </select>
+  </label>
+
+  <label>
+    Data C
+    <input id="dataC" type="number" min="0" max="255" value="35" />
+  </label>
+</div>
 
       <p class="hint">
-        The simulator loads: <strong>LDA 9H, ADD AH, SUB BH, OUT, HLT</strong><br />
-        It computes <strong>A + B − C</strong> and displays the 8-bit result.
-      </p>
+  Choose two operations and three values. The simulator builds a SAP-1 program,
+  executes it, and displays the 8-bit result.
+</p>
 
       <div class="controls">
         <button id="loadBtn" class="btn primary">Load Program</button>

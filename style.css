@@ -386,6 +386,24 @@ footer {
   border-top: 1px solid rgba(229, 9, 20, 0.18);
 }
 
+select {
+  width: 100%;
+  background: #120307;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  color: var(--pale);
+  font-family: inherit;
+  font-size: 16px;
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--bright-red);
+  box-shadow: 0 0 14px rgba(229, 9, 20, 0.45);
+}
+
+
 /* Tablets and large phones */
 @media (max-width: 900px) {
   main {
