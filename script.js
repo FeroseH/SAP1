@@ -26,6 +26,10 @@ let running = false;
 let runTimer = null;
 let awaitingFetch = true;
 
+const ADDRESS_A = 0x9; // 9H
+const ADDRESS_B = 0xa; // AH
+const ADDRESS_C = 0xb; // BH
+
 const elements = {
   dataA: document.getElementById("dataA"),
   dataB: document.getElementById("dataB"),
@@ -51,10 +55,25 @@ const elements = {
   controlSignals: document.getElementById("controlSignals"),
   ramBody: document.getElementById("ramBody"),
   busMessage: document.getElementById("busMessage"),
+  dataPacket: document.getElementById("dataPacket"),
   ledRow: document.getElementById("ledRow"),
   decimalOutput: document.getElementById("decimalOutput"),
   hexOutput: document.getElementById("hexOutput")
 };
+
+const busPositions = {
+  pc: 8,
+  mar: 20.5,
+  ram: 33,
+  ir: 45.5,
+  a: 58,
+  b: 70.5,
+  alu: 83,
+  output: 95.5
+};
+
+let busQueue = [];
+let busBusy = false;
 
 function toBinary(value, bits) {
   return value.toString(2).padStart(bits, "0");
@@ -79,6 +98,80 @@ function validateData(raw, label) {
   return value;
 }
 
+function getStation(name) {
+  return document.querySelector(`.bus-station[data-node="${name}"]`);
+}
+
+function clearBusEffects() {
+  document.querySelectorAll(".bus-station").forEach((station) => {
+    station.classList.remove("active", "receiving");
+  });
+}
+
+function animateDataTransfer(source, destination, message, callback = null) {
+  busQueue.push({
+    source,
+    destination,
+    message,
+    callback
+  });
+
+  if (!busBusy) {
+    processBusQueue();
+  }
+}
+
+function processBusQueue() {
+  if (busQueue.length === 0) {
+    busBusy = false;
+    return;
+  }
+
+  busBusy = true;
+
+  const transfer = busQueue.shift();
+  const packet = elements.dataPacket;
+  const sourceStation = getStation(transfer.source);
+  const destinationStation = getStation(transfer.destination);
+
+  if (!packet || !sourceStation || !destinationStation) {
+    processBusQueue();
+    return;
+  }
+
+  clearBusEffects();
+  sourceStation.classList.add("active");
+
+  packet.classList.remove("traveling");
+  packet.style.left = `${busPositions[transfer.source]}%`;
+  packet.style.opacity = "1";
+
+  setBusMessage(transfer.message);
+
+  requestAnimationFrame(() => {
+    packet.classList.add("traveling");
+    packet.style.left = `${busPositions[transfer.destination]}%`;
+  });
+
+  setTimeout(() => {
+    destinationStation.classList.add("active", "receiving");
+
+    if (transfer.callback) {
+      transfer.callback();
+    }
+  }, 800);
+
+  setTimeout(() => {
+    packet.classList.remove("traveling");
+    packet.style.opacity = "0";
+    processBusQueue();
+  }, 1100);
+}
+
+function setBusMessage(message) {
+  elements.busMessage.textContent = message;
+}
+
 function renderRam(activeAddress = null) {
   elements.ramBody.innerHTML = "";
 
@@ -86,8 +179,13 @@ function renderRam(activeAddress = null) {
     const value = ram[address];
     const row = document.createElement("tr");
 
-    if (address === activeAddress) row.classList.add("active");
-    if (address < 5) row.classList.add("program");
+    if (address === activeAddress) {
+      row.classList.add("active");
+    }
+
+    if (address < 5) {
+      row.classList.add("program");
+    }
 
     const meaning =
       address < 5
@@ -105,32 +203,7 @@ function renderRam(activeAddress = null) {
   }
 }
 
-function activateRegister(id) {
-  document.querySelectorAll(".register").forEach((node) => {
-    node.classList.remove("active");
-  });
-
-  if (id) {
-    document.getElementById(`reg-${id}`).classList.add("active");
-  }
-}
-
-function activateBusNodes(names) {
-  document.querySelectorAll(".bus-node").forEach((node) => {
-    node.classList.remove("active");
-  });
-
-  names.forEach((name) => {
-    const node = document.querySelector(`[data-node="${name}"]`);
-    if (node) node.classList.add("active");
-  });
-}
-
-function setBusMessage(message) {
-  elements.busMessage.textContent = message;
-}
-
-function render(activeAddress = null, activeRegister = null, busNodes = []) {
+function render(activeAddress = null, activeRegister = null) {
   elements.pcValue.textContent = toBinary(pc, 4);
   elements.marValue.textContent = toBinary(mar, 4);
   elements.irValue.textContent = toBinary(ir, 8);
@@ -157,8 +230,14 @@ function render(activeAddress = null, activeRegister = null, busNodes = []) {
   });
 
   renderRam(activeAddress);
-  activateRegister(activeRegister);
-  activateBusNodes(busNodes);
+
+  document.querySelectorAll(".register").forEach((node) => {
+    node.classList.remove("active");
+  });
+
+  if (activeRegister) {
+    document.getElementById(`reg-${activeRegister}`).classList.add("active");
+  }
 }
 
 function loadProgram() {
@@ -169,33 +248,25 @@ function loadProgram() {
   const operationB = elements.operationB.value;
   const operationC = elements.operationC.value;
 
-  if (a === null || b === null || c === null) return;
+  if (a === null || b === null || c === null) {
+    return;
+  }
 
   ram = new Array(16).fill(0);
 
-  // Data locations
-  const ADDRESS_A = 0x9; // 9H
-  const ADDRESS_B = 0xa; // AH
-  const ADDRESS_C = 0xb; // BH
+  ram[0] = (0b0000 << 4) | ADDRESS_A; // LDA 9H
 
-  // Instruction 0: LDA 9H
-  ram[0] = (0b0000 << 4) | ADDRESS_A;
-
-  // Instruction 1: ADD AH or SUB AH
   ram[1] = operationB === "ADD"
-    ? (0b0001 << 4) | ADDRESS_B
-    : (0b0010 << 4) | ADDRESS_B;
+    ? (0b0001 << 4) | ADDRESS_B // ADD AH
+    : (0b0010 << 4) | ADDRESS_B; // SUB AH
 
-  // Instruction 2: ADD BH or SUB BH
   ram[2] = operationC === "ADD"
-    ? (0b0001 << 4) | ADDRESS_C
-    : (0b0010 << 4) | ADDRESS_C;
+    ? (0b0001 << 4) | ADDRESS_C // ADD BH
+    : (0b0010 << 4) | ADDRESS_C; // SUB BH
 
-  // Instructions 3 and 4
   ram[3] = 0b11101111; // OUT
   ram[4] = 0b11111111; // HLT
 
-  // Store user data
   ram[ADDRESS_A] = a;
   ram[ADDRESS_B] = b;
   ram[ADDRESS_C] = c;
@@ -208,7 +279,7 @@ function loadProgram() {
   elements.status.textContent =
     `Program loaded: ${a} ${symbolB} ${b} ${symbolC} ${c}. Press Step or Run.`;
 
-  render(0, "pc", ["pc"]);
+  render(0, "pc");
 }
 
 function resetRegisters(clearRam = true) {
@@ -222,13 +293,23 @@ function resetRegisters(clearRam = true) {
   awaitingFetch = true;
 
   stopRun();
+  clearBusEffects();
+
+  busQueue = [];
+  busBusy = false;
+
+  if (elements.dataPacket) {
+    elements.dataPacket.classList.remove("traveling");
+    elements.dataPacket.style.opacity = "0";
+    elements.dataPacket.style.left = `${busPositions.pc}%`;
+  }
 
   if (clearRam) {
     ram = new Array(16).fill(0);
   }
 
   elements.status.textContent = "Simulator reset.";
-  render(0, "pc", ["pc"]);
+  render(0, "pc");
 }
 
 function fetchPhase() {
@@ -237,9 +318,19 @@ function fetchPhase() {
   pc = (pc + 1) & 0x0f;
   awaitingFetch = false;
 
-  render(mar, "ir", ["pc", "mar", "ram", "ir"]);
-  setBusMessage(
-    `FETCH: PC ${toBinary(mar, 4)} → MAR; RAM[${toHex(mar)}] → IR; PC incremented.`
+  render(mar, "ir");
+
+  animateDataTransfer(
+    "pc",
+    "mar",
+    `FETCH: PC sends address ${toBinary(mar, 4)} to MAR.`,
+    () => {
+      animateDataTransfer(
+        "ram",
+        "ir",
+        `FETCH: RAM[${toHex(mar)}] sends instruction ${toBinary(ir, 8)} to IR.`
+      );
+    }
   );
 }
 
@@ -251,37 +342,78 @@ function executePhase() {
     case 0b0000: // LDA
       mar = operand;
       accumulator = ram[mar];
-      render(mar, "a", ["mar", "ram", "a"]);
-      setBusMessage(`LDA: RAM[${toHex(mar)}] → W-Bus → Accumulator.`);
+      render(mar, "a");
+
+      animateDataTransfer(
+        "ram",
+        "a",
+        `LDA: RAM[${toHex(mar)}] sends ${accumulator} to the Accumulator.`
+      );
       break;
 
     case 0b0001: // ADD
       mar = operand;
       bRegister = ram[mar];
       accumulator = clampByte(accumulator + bRegister);
-      render(mar, "a", ["mar", "ram", "b", "alu", "a"]);
-      setBusMessage(`ADD: RAM[${toHex(mar)}] → B; ALU computes A + B → Accumulator.`);
+      render(mar, "a");
+
+      animateDataTransfer(
+        "ram",
+        "b",
+        `ADD: RAM[${toHex(mar)}] sends ${bRegister} to the B Register.`,
+        () => {
+          animateDataTransfer(
+            "alu",
+            "a",
+            `ALU sends ${accumulator} to the Accumulator.`
+          );
+        }
+      );
       break;
 
     case 0b0010: // SUB
       mar = operand;
       bRegister = ram[mar];
       accumulator = clampByte(accumulator - bRegister);
-      render(mar, "a", ["mar", "ram", "b", "alu", "a"]);
-      setBusMessage(`SUB: RAM[${toHex(mar)}] → B; ALU computes A − B using 2's complement → Accumulator.`);
+      render(mar, "a");
+
+      animateDataTransfer(
+        "ram",
+        "b",
+        `SUB: RAM[${toHex(mar)}] sends ${bRegister} to the B Register.`,
+        () => {
+          animateDataTransfer(
+            "alu",
+            "a",
+            `ALU sends ${accumulator} to the Accumulator.`
+          );
+        }
+      );
       break;
 
     case 0b1110: // OUT
       outputRegister = accumulator;
-      render(null, "output", ["a", "output"]);
-      setBusMessage("OUT: Accumulator → W-Bus → Output Register.");
+      render(null, "output");
+
+      animateDataTransfer(
+        "a",
+        "output",
+        `OUT: Accumulator sends ${outputRegister} to the Output Register.`
+      );
       break;
 
     case 0b1111: // HLT
       halted = true;
       stopRun();
-      render(null, null, []);
+      render(null, null);
       setBusMessage("HLT: Processor halted.");
+
+      document.body.classList.add("halt-flash");
+
+      setTimeout(() => {
+        document.body.classList.remove("halt-flash");
+      }, 850);
+
       elements.status.textContent =
         `Execution halted. Output: ${outputRegister} decimal, ${toHex(outputRegister)}, ${toBinary(outputRegister, 8)}.`;
       return;
@@ -290,7 +422,7 @@ function executePhase() {
       halted = true;
       stopRun();
       elements.status.textContent = `Unknown opcode ${toBinary(opcode, 4)}. Execution halted.`;
-      render(null, null, []);
+      render(null, null);
       return;
   }
 
@@ -367,5 +499,5 @@ elements.clockSpeed.addEventListener("input", () => {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
-  render(0, "pc", ["pc"]);
+  render(0, "pc");
 });

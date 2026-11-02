@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SAP-1 Simulator — The Upside Down</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
@@ -19,47 +20,47 @@
   </header>
 
   <main>
-    <!-- Program loader -->
+    <!-- Program Loader -->
     <section class="panel loader-panel">
       <h2>Load Program</h2>
 
       <div class="form-grid">
-  <label>
-    Data A
-    <input id="dataA" type="number" min="0" max="255" value="37" />
-  </label>
+        <label>
+          Data A
+          <input id="dataA" type="number" min="0" max="255" value="36" />
+        </label>
 
-  <label>
-    Operation for B
-    <select id="operationB">
-      <option value="ADD">Add B (+)</option>
-      <option value="SUB">Subtract B (−)</option>
-    </select>
-  </label>
+        <label>
+          Operation for B
+          <select id="operationB">
+            <option value="SUB">Subtract B (−)</option>
+            <option value="ADD">Add B (+)</option>
+          </select>
+        </label>
 
-  <label>
-    Data B
-    <input id="dataB" type="number" min="0" max="255" value="5" />
-  </label>
+        <label>
+          Data B
+          <input id="dataB" type="number" min="0" max="255" value="5" />
+        </label>
 
-  <label>
-    Operation for C
-    <select id="operationC">
-      <option value="SUB">Subtract C (−)</option>
-      <option value="ADD">Add C (+)</option>
-    </select>
-  </label>
+        <label>
+          Operation for C
+          <select id="operationC">
+            <option value="ADD">Add C (+)</option>
+            <option value="SUB">Subtract C (−)</option>
+          </select>
+        </label>
 
-  <label>
-    Data C
-    <input id="dataC" type="number" min="0" max="255" value="35" />
-  </label>
-</div>
+        <label>
+          Data C
+          <input id="dataC" type="number" min="0" max="255" value="2" />
+        </label>
+      </div>
 
       <p class="hint">
-  Choose two operations and three values. The simulator builds a SAP-1 program,
-  executes it, and displays the 8-bit result.
-</p>
+        Choose two operations and three values. The simulator builds a SAP-1 program,
+        executes it, and displays the 8-bit result.
+      </p>
 
       <div class="controls">
         <button id="loadBtn" class="btn primary">Load Program</button>
@@ -74,7 +75,9 @@
         <span id="clockLabel">800 ms</span>
       </label>
 
-      <div id="status" class="status">Enter values, then load the program.</div>
+      <div id="status" class="status">
+        Enter values, choose operations, then load the program.
+      </div>
     </section>
 
     <!-- Registers -->
@@ -121,18 +124,22 @@
 
       <div class="decode-box">
         <h3>Controller-Sequencer</h3>
+
         <div class="decode-row">
           <span>Opcode:</span>
           <span id="opcodeValue">----</span>
         </div>
+
         <div class="decode-row">
           <span>Operand:</span>
           <span id="operandValue">--</span>
         </div>
+
         <div class="decode-row">
           <span>Instruction:</span>
           <span id="instructionName">IDLE</span>
         </div>
+
         <div class="decode-row">
           <span>Control signals:</span>
           <span id="controlSignals">—</span>
@@ -140,54 +147,63 @@
       </div>
     </section>
 
-    <!-- RAM and bus -->
+    <!-- RAM and W-Bus -->
     <section class="panel memory-panel">
       <h2>RAM — 16 × 8</h2>
 
       <div class="memory-layout">
-        <table class="ram-table">
-          <thead>
-            <tr>
-              <th>Address</th>
-              <th>Binary</th>
-              <th>Hex</th>
-              <th>Meaning</th>
-            </tr>
-          </thead>
-          <tbody id="ramBody"></tbody>
-        </table>
+        <div class="ram-wrapper">
+          <table class="ram-table">
+            <thead>
+              <tr>
+                <th>Address</th>
+                <th>Binary</th>
+                <th>Hex</th>
+                <th>Meaning</th>
+              </tr>
+            </thead>
+            <tbody id="ramBody"></tbody>
+          </table>
+        </div>
 
         <div class="bus-side">
-          <h3>W-Bus</h3>
-          <div class="bus-track" id="busTrack">
-            <div class="bus-node" data-node="pc">PC</div>
-            <div class="bus-node" data-node="mar">MAR</div>
-            <div class="bus-node" data-node="ram">RAM</div>
-            <div class="bus-node" data-node="ir">IR</div>
-            <div class="bus-node" data-node="a">A</div>
-            <div class="bus-node" data-node="b">B</div>
-            <div class="bus-node" data-node="alu">ALU</div>
-            <div class="bus-node" data-node="output">OUT</div>
-          </div>
+          <h3>W-Bus Data Flow</h3>
+
+          <div class="bus-stage" id="busStage">
+  <div class="bus-line"></div>
+
+  <div class="bus-station" data-node="pc"><span>PC</span></div>
+  <div class="bus-station" data-node="mar"><span>MAR</span></div>
+  <div class="bus-station" data-node="ram"><span>RAM</span></div>
+  <div class="bus-station" data-node="ir"><span>IR</span></div>
+  <div class="bus-station" data-node="a"><span>A</span></div>
+  <div class="bus-station" data-node="b"><span>B</span></div>
+  <div class="bus-station" data-node="alu"><span>ALU</span></div>
+  <div class="bus-station" data-node="output"><span>OUT</span></div>
+
+  <div class="data-packet" id="dataPacket"></div>
+</div>
+
           <div class="bus-message" id="busMessage">W-Bus idle</div>
         </div>
       </div>
     </section>
 
-    <!-- Output LEDs -->
+    <!-- Output Display -->
     <section class="panel output-panel">
       <h2>Binary Output Display</h2>
 
       <div class="led-row" id="ledRow">
-  <div class="led"></div>
-  <div class="led"></div>
-  <div class="led"></div>
-  <div class="led"></div>
-  <div class="led"></div>
-  <div class="led"></div>
-  <div class="led"></div>
-  <div class="led"></div>
-</div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+        <div class="led"></div>
+      </div>
+
       <div class="output-reading">
         Decimal: <span id="decimalOutput">0</span>
         &nbsp;|&nbsp;
