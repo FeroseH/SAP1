@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SAP-1 Simulator — The Upside Down</title>
+  <title>SAP-1 Simulator — Computer Architecture and Organization</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,9 +26,32 @@
 
       <div class="form-grid">
         <label>
-          Data A
-          <input id="dataA" type="number" min="0" max="255" value="36" />
-        </label>
+  Data A address
+  <select id="addressA">
+    <option value="5">5H</option>
+    <option value="6">6H</option>
+    <option value="7">7H</option>
+    <option value="8">8H</option>
+    <option value="9" selected>9H</option>
+    <option value="10">AH</option>
+    <option value="11">BH</option>
+    <option value="12">CH</option>
+    <option value="13">DH</option>
+  </select>
+</label>
+
+        <label>
+  Data A (hex)
+  <input
+    id="dataA"
+    type="text"
+    value="25"
+    placeholder="00–FF"
+    maxlength="4"
+    spellcheck="false"
+    autocomplete="off"
+  />
+</label>
 
         <label>
           Operation for B
@@ -39,9 +62,18 @@
         </label>
 
         <label>
-          Data B
-          <input id="dataB" type="number" min="0" max="255" value="5" />
-        </label>
+  Data B (hex)
+  <input
+    id="dataB"
+    type="text"
+    value="05"
+    placeholder="00–FF"
+    maxlength="4"
+    spellcheck="false"
+    autocomplete="off"
+  />
+</label>
+
 
         <label>
           Operation for C
@@ -52,9 +84,17 @@
         </label>
 
         <label>
-          Data C
-          <input id="dataC" type="number" min="0" max="255" value="2" />
-        </label>
+  Data C (hex)
+  <input
+    id="dataC"
+    type="text"
+    value="23"
+    placeholder="00–FF"
+    maxlength="4"
+    spellcheck="false"
+    autocomplete="off"
+  />
+</label>
       </div>
 
       <p class="hint">
@@ -70,10 +110,19 @@
       </div>
 
       <label class="clock-label">
-        Clock speed
-        <input id="clockSpeed" type="range" min="200" max="2000" step="100" value="800" />
-        <span id="clockLabel">800 ms</span>
-      </label>
+  Transfer time
+
+  <input
+    id="clockSpeed"
+    type="range"
+    min="200"
+    max="2000"
+    step="100"
+    value="800"
+  />
+
+  <span id="clockLabel">800 ms / transfer</span>
+</label>
 
       <div id="status" class="status">
         Enter values, choose operations, then load the program.
@@ -190,26 +239,29 @@
     </section>
 
     <!-- Output Display -->
-    <section class="panel output-panel">
-      <h2>Binary Output Display</h2>
+<section class="panel output-panel">
+  <h2>Binary Output Display</h2>
 
-      <div class="led-row" id="ledRow">
-        <div class="led"></div>
-        <div class="led"></div>
-        <div class="led"></div>
-        <div class="led"></div>
-        <div class="led"></div>
-        <div class="led"></div>
-        <div class="led"></div>
-        <div class="led"></div>
-      </div>
+  <div class="led-row" id="ledRow">
+    <div class="led"></div>
+    <div class="led"></div>
+    <div class="led"></div>
+    <div class="led"></div>
+    <div class="led"></div>
+    <div class="led"></div>
+    <div class="led"></div>
+    <div class="led"></div>
+  </div>
 
-      <div class="output-reading">
-        Decimal: <span id="decimalOutput">0</span>
-        &nbsp;|&nbsp;
-        Hexadecimal: <span id="hexOutput">00H</span>
-      </div>
-    </section>
+  <div class="output-result">
+    <span id="hexOutput">00H</span>
+    <span>(<span id="binaryOutput">0000 0000</span>)</span>
+  </div>
+
+  <div class="output-reading">
+    Decimal: <span id="decimalOutput">0</span>
+  </div>
+</section>
   </main>
 
   <footer>

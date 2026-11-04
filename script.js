@@ -26,9 +26,7 @@ let running = false;
 let runTimer = null;
 let awaitingFetch = true;
 
-const ADDRESS_A = 0x9; // 9H
-const ADDRESS_B = 0xa; // AH
-const ADDRESS_C = 0xb; // BH
+
 
 const elements = {
   dataA: document.getElementById("dataA"),
@@ -36,6 +34,7 @@ const elements = {
   dataC: document.getElementById("dataC"),
   operationB: document.getElementById("operationB"),
   operationC: document.getElementById("operationC"),
+  addressA: document.getElementById("addressA"),
   loadBtn: document.getElementById("loadBtn"),
   stepBtn: document.getElementById("stepBtn"),
   runBtn: document.getElementById("runBtn"),
@@ -58,7 +57,8 @@ const elements = {
   dataPacket: document.getElementById("dataPacket"),
   ledRow: document.getElementById("ledRow"),
   decimalOutput: document.getElementById("decimalOutput"),
-  hexOutput: document.getElementById("hexOutput")
+  hexOutput: document.getElementById("hexOutput"),
+  binaryOutput: document.getElementById("binaryOutput")
 };
 
 const busPositions = {
@@ -74,9 +74,40 @@ const busPositions = {
 
 let busQueue = [];
 let busBusy = false;
+let busTimers = [];
+let busGeneration = 0;
 
+function scheduleBusTask(callback, delay) {
+  const timer = setTimeout(callback, delay);
+  busTimers.push(timer);
+}
+
+function cancelBusAnimations() {
+  busGeneration++;
+
+  busTimers.forEach(clearTimeout);
+  busTimers = [];
+
+  busQueue = [];
+  busBusy = false;
+
+  clearBusEffects();
+
+  if (elements.dataPacket) {
+    elements.dataPacket.classList.remove("traveling");
+    elements.dataPacket.style.opacity = "0";
+  }
+
+  document.body.classList.remove("halt-flash");
+}
 function toBinary(value, bits) {
   return value.toString(2).padStart(bits, "0");
+}
+
+function formatByte(value) {
+  const binary = toBinary(value, 8);
+
+  return `${binary.slice(0, 4)} ${binary.slice(4)}`;
 }
 
 function toHex(value) {
@@ -88,14 +119,24 @@ function clampByte(value) {
 }
 
 function validateData(raw, label) {
-  const value = Number(raw);
+  const text = String(raw).trim();
 
-  if (!Number.isInteger(value) || value < 0 || value > 255) {
-    elements.status.textContent = `${label} must be an integer from 0 to 255.`;
+  // Accept 25, 25H, or 0x25; reject invalid or incomplete input.
+  const validHex = /^(?:[0-9a-f]{1,2}h?|0x[0-9a-f]{1,2})$/i;
+
+  if (!validHex.test(text)) {
+    elements.status.textContent =
+      `${label} must be hexadecimal from 00 to FF. ` +
+      `Examples: 25, 25H, or 0x25.`;
+
     return null;
   }
 
-  return value;
+  const digits = text
+    .replace(/^0x/i, "")
+    .replace(/h$/i, "");
+
+  return parseInt(digits, 16);
 }
 
 function getStation(name) {
@@ -124,48 +165,79 @@ function animateDataTransfer(source, destination, message, callback = null) {
 function processBusQueue() {
   if (busQueue.length === 0) {
     busBusy = false;
+    clearBusEffects();
     return;
   }
 
   busBusy = true;
 
   const transfer = busQueue.shift();
+  const generation = busGeneration;
+
   const packet = elements.dataPacket;
   const sourceStation = getStation(transfer.source);
   const destinationStation = getStation(transfer.destination);
 
   if (!packet || !sourceStation || !destinationStation) {
+    if (transfer.callback) {
+      transfer.callback();
+    }
+
     processBusQueue();
     return;
   }
+
+  // Each bus transfer uses the selected duration.
+  const duration = Number(elements.clockSpeed.value);
+  const travelTime = Math.round(duration * 0.8);
 
   clearBusEffects();
   sourceStation.classList.add("active");
 
   packet.classList.remove("traveling");
+
+  // Position the packet instantly at the source.
+  packet.style.transition = "none";
   packet.style.left = `${busPositions[transfer.source]}%`;
   packet.style.opacity = "1";
+
+  // Commit the starting position.
+  void packet.offsetWidth;
 
   setBusMessage(transfer.message);
 
   requestAnimationFrame(() => {
+    if (generation !== busGeneration) return;
+
     packet.classList.add("traveling");
-    packet.style.left = `${busPositions[transfer.destination]}%`;
+
+    // Override the fixed duration from the stylesheet.
+    packet.style.transition =
+      `left ${travelTime}ms linear`;
+
+    packet.style.left =
+      `${busPositions[transfer.destination]}%`;
+
+    scheduleBusTask(() => {
+      if (generation !== busGeneration) return;
+
+      destinationStation.classList.add("active", "receiving");
+
+      if (transfer.callback) {
+        transfer.callback();
+      }
+    }, travelTime);
+
+    scheduleBusTask(() => {
+      if (generation !== busGeneration) return;
+
+      packet.classList.remove("traveling");
+      packet.style.opacity = "0";
+
+      clearBusEffects();
+      processBusQueue();
+    }, duration);
   });
-
-  setTimeout(() => {
-    destinationStation.classList.add("active", "receiving");
-
-    if (transfer.callback) {
-      transfer.callback();
-    }
-  }, 800);
-
-  setTimeout(() => {
-    packet.classList.remove("traveling");
-    packet.style.opacity = "0";
-    processBusQueue();
-  }, 1100);
 }
 
 function setBusMessage(message) {
@@ -188,13 +260,13 @@ function renderRam(activeAddress = null) {
     }
 
     const meaning =
-      address < 5
-        ? OPCODES[toBinary(value >> 4, 4)] ?? "UNKNOWN"
-        : `DATA ${value}`;
+  address < 5
+    ? OPCODES[toBinary(value >> 4, 4)] ?? "UNKNOWN"
+    : `DATA ${toHex(value)} (${value} decimal)`;
 
     row.innerHTML = `
       <td>${address.toString(16).toUpperCase()}H</td>
-      <td>${toBinary(value, 8)}</td>
+<td>${formatByte(value)}</td>
       <td>${toHex(value)}</td>
       <td>${meaning}</td>
     `;
@@ -205,11 +277,12 @@ function renderRam(activeAddress = null) {
 
 function render(activeAddress = null, activeRegister = null) {
   elements.pcValue.textContent = toBinary(pc, 4);
-  elements.marValue.textContent = toBinary(mar, 4);
-  elements.irValue.textContent = toBinary(ir, 8);
-  elements.aValue.textContent = toBinary(accumulator, 8);
-  elements.bValue.textContent = toBinary(bRegister, 8);
-  elements.outputValue.textContent = toBinary(outputRegister, 8);
+elements.marValue.textContent = toBinary(mar, 4);
+
+elements.irValue.textContent = formatByte(ir);
+elements.aValue.textContent = formatByte(accumulator);
+elements.bValue.textContent = formatByte(bRegister);
+elements.outputValue.textContent = formatByte(outputRegister);
 
   const opcode = toBinary(ir >> 4, 4);
   const operand = toBinary(ir & 0x0f, 4);
@@ -221,8 +294,9 @@ function render(activeAddress = null, activeRegister = null) {
   elements.controlSignals.textContent =
     halted && ir === 0 ? "—" : CONTROL_SIGNALS[opcode] ?? "Unknown opcode";
 
-  elements.decimalOutput.textContent = outputRegister;
-  elements.hexOutput.textContent = toHex(outputRegister);
+ elements.decimalOutput.textContent = outputRegister;
+elements.hexOutput.textContent = toHex(outputRegister);
+elements.binaryOutput.textContent = formatByte(outputRegister);
 
   document.querySelectorAll(".led").forEach((led, index) => {
     const bit = 7 - index;
@@ -245,71 +319,101 @@ function loadProgram() {
   const b = validateData(elements.dataB.value, "Data B");
   const c = validateData(elements.dataC.value, "Data C");
 
-  const operationB = elements.operationB.value;
-  const operationC = elements.operationC.value;
-
   if (a === null || b === null || c === null) {
     return;
   }
 
-  ram = new Array(16).fill(0);
+  const operationB = elements.operationB.value;
+  const operationC = elements.operationC.value;
 
-  ram[0] = (0b0000 << 4) | ADDRESS_A; // LDA 9H
+  if (
+    !["ADD", "SUB"].includes(operationB) ||
+    !["ADD", "SUB"].includes(operationC)
+  ) {
+    elements.status.textContent = "Choose ADD or SUB for both operations.";
+    return;
+  }
 
-  ram[1] = operationB === "ADD"
-    ? (0b0001 << 4) | ADDRESS_B // ADD AH
-    : (0b0010 << 4) | ADDRESS_B; // SUB AH
+  // Dropdown values must be decimal strings:
+  // value="10" means address AH.
+  const addressA = Number(elements.addressA.value);
+  const addressB = addressA + 1;
+  const addressC = addressA + 2;
 
-  ram[2] = operationC === "ADD"
-    ? (0b0001 << 4) | ADDRESS_C // ADD BH
-    : (0b0010 << 4) | ADDRESS_C; // SUB BH
+  // 0H–4H contain the five instructions.
+  // Three consecutive data bytes must fit within 5H–FH.
+  if (
+    !Number.isInteger(addressA) ||
+    addressA < 5 ||
+    addressA > 13
+  ) {
+    elements.status.textContent =
+      "Choose a Data A address from 5H to DH. " +
+      "Addresses 0H–4H contain the program.";
+    return;
+  }
+
+  resetRegisters(true);
+
+  ram[0] = addressA; // LDA <addressA>
+
+  ram[1] =
+    ((operationB === "ADD" ? 0b0001 : 0b0010) << 4) |
+    addressB;
+
+  ram[2] =
+    ((operationC === "ADD" ? 0b0001 : 0b0010) << 4) |
+    addressC;
 
   ram[3] = 0b11101111; // OUT
   ram[4] = 0b11111111; // HLT
 
-  ram[ADDRESS_A] = a;
-  ram[ADDRESS_B] = b;
-  ram[ADDRESS_C] = c;
+  ram[addressA] = a;
+  ram[addressB] = b;
+  ram[addressC] = c;
 
-  resetRegisters(false);
+  halted = false;
 
   const symbolB = operationB === "ADD" ? "+" : "−";
   const symbolC = operationC === "ADD" ? "+" : "−";
 
   elements.status.textContent =
-    `Program loaded: ${a} ${symbolB} ${b} ${symbolC} ${c}. Press Step or Run.`;
+    `Program loaded: ${toHex(a)} ${symbolB} ${toHex(b)} ` +
+    `${symbolC} ${toHex(c)}. ` +
+    `Data starts at ${addressA.toString(16).toUpperCase()}H. ` +
+    `Press Step or Run.`;
 
+  setBusMessage("W-Bus ready.");
   render(0, "pc");
 }
 
 function resetRegisters(clearRam = true) {
+  stopRun();
+  cancelBusAnimations();
+
   pc = 0;
   mar = 0;
   ir = 0;
   accumulator = 0;
   bRegister = 0;
   outputRegister = 0;
-  halted = false;
+
   awaitingFetch = true;
 
-  stopRun();
-  clearBusEffects();
-
-  busQueue = [];
-  busBusy = false;
-
-  if (elements.dataPacket) {
-    elements.dataPacket.classList.remove("traveling");
-    elements.dataPacket.style.opacity = "0";
-    elements.dataPacket.style.left = `${busPositions.pc}%`;
-  }
+  // An empty RAM is not a loaded program.
+  halted = clearRam;
 
   if (clearRam) {
     ram = new Array(16).fill(0);
   }
 
-  elements.status.textContent = "Simulator reset.";
-  render(0, "pc");
+  elements.status.textContent =
+    clearRam
+      ? "Simulator reset. Load a program to begin."
+      : "Registers reset.";
+
+  setBusMessage("W-Bus idle.");
+  render();
 }
 
 function fetchPhase() {
@@ -436,8 +540,14 @@ function executePhase() {
 }
 
 function step() {
+  // Wait until every transfer for the current phase finishes.
+  if (busBusy || busQueue.length > 0) {
+    return;
+  }
+
   if (halted) {
-    elements.status.textContent = "The processor is halted. Load a program or reset.";
+    elements.status.textContent =
+      "Load a program before running, or reload after HLT.";
     return;
   }
 
@@ -449,28 +559,30 @@ function step() {
 }
 
 function run() {
-  if (halted) {
-    elements.status.textContent = "Load a program before running.";
+  if (running) {
+    stopRun();
     return;
   }
 
-  if (running) {
-    stopRun();
+  if (halted) {
+    elements.status.textContent =
+      "Load a program before running.";
     return;
   }
 
   running = true;
   elements.runBtn.textContent = "Stop";
 
-  const delay = Number(elements.clockSpeed.value);
-
   runTimer = setInterval(() => {
-    step();
-
     if (halted) {
       stopRun();
+      return;
     }
-  }, delay);
+
+    if (!busBusy && busQueue.length === 0) {
+      step();
+    }
+  }, 20);
 }
 
 function stopRun() {
@@ -490,13 +602,12 @@ elements.runBtn.addEventListener("click", run);
 elements.resetBtn.addEventListener("click", () => resetRegisters(true));
 
 elements.clockSpeed.addEventListener("input", () => {
-  elements.clockLabel.textContent = `${elements.clockSpeed.value} ms`;
-
-  if (running) {
-    stopRun();
-    run();
-  }
+  elements.clockLabel.textContent =
+    `${elements.clockSpeed.value} ms / transfer`;
 });
+
+elements.clockLabel.textContent =
+  `${elements.clockSpeed.value} ms / transfer`;
 
 document.addEventListener("DOMContentLoaded", () => {
   render(0, "pc");
